@@ -148,7 +148,8 @@ print("Archivos encriptados y sobrescritos en su ubicación original.")
 ```
 
 #### decrypt.py
-```
+
+```python
 import os
 import tkinter as tk
 from tkinter import simpledialog, messagebox
